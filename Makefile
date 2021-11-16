@@ -1,5 +1,9 @@
-test_publish:
-	python3 setup.py sdist bdist_wheel upload --sign -r https://testpypi.python.org/pypi
+format:
+	isort .
+	black .
 
-publish:
-	python3 setup.py sdist bdist_wheel upload --sign
+test:
+	tox -e py39
+
+test_all:
+	tox

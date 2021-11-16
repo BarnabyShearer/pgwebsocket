@@ -1,23 +1,26 @@
 """
-pgwebsocket
-===========
+pgwebswocket
+============
 
 Proxy websocket messages to and from PostgreSQL
 
 Note: This dose not handle authentication and authorization, ensure you implement them at other layers.
 """
 
-import json
 import asyncio
-import traceback
+import json
 import logging
+import traceback
+from typing import Any, Awaitable, Callable, Coroutine
+
 import psycopg2
 import psycopg2.extras
 from aiohttp import web
 
 LOGGER = logging.getLogger(__name__)
 
-async def _pinger(websocket):
+
+async def _pinger(websocket: web.WebSocketResponse) -> None:
     """Loop to ping every 30s to prevent timeouts"""
     while True:
         await asyncio.sleep(30)
@@ -27,10 +30,29 @@ async def _pinger(websocket):
             LOGGER.debug("ping error")
             break
 
-class Ctx(object):
+
+class Ctx:
     """Context with websocket and psycopg2 connections"""
 
-    def __init__(self, websocket, dburi, remote_ip, remote_user, on_connect, on_disconnect):
+    def __init__(
+        self,
+        websocket: web.WebSocketResponse,
+        dburi: str,
+        remote_ip: str,
+        remote_user: str,
+        on_connect: Callable[
+            [
+                "Ctx",
+            ],
+            Awaitable[Any],
+        ],
+        on_disconnect: Callable[
+            [
+                "Ctx",
+            ],
+            Awaitable[Any],
+        ],
+    ) -> None:
         """Connect to pg"""
         self._websocket = websocket
         self._remote_ip = remote_ip
@@ -40,11 +62,11 @@ class Ctx(object):
         psycopg2.extras.wait_select(self._conn)
         asyncio.ensure_future(on_connect(self))
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Remove connection"""
         asyncio.get_event_loop().remove_reader(self._conn.fileno())
 
-    async def _listen(self):
+    async def _listen(self) -> None:
         """notifyed"""
         self._conn.poll()
         while self._conn.notifies:
@@ -57,7 +79,7 @@ class Ctx(object):
                 asyncio.get_event_loop().remove_reader(self._conn.fileno())
                 await self._on_disconnect(self)
 
-    async def execute(self, sql, *args, **kwargs):
+    async def execute(self, sql: str, *args: Any, **kwargs: Any) -> Any:
         """Run an SQL query"""
         cur = self._conn.cursor()
         LOGGER.debug("%s", cur.mogrify(sql, args if len(args) > 0 else kwargs))
@@ -73,7 +95,7 @@ class Ctx(object):
         await self._listen()
         return ret
 
-    async def callproc(self, sql, *args):
+    async def callproc(self, sql: str, *args: Any) -> Any:
         """Call a stored procedure"""
         cur = self._conn.cursor()
         LOGGER.debug("%s%s", sql, args)
@@ -90,69 +112,85 @@ class Ctx(object):
         return ret
 
     @property
-    def remote_ip(self):
+    def remote_ip(self) -> str:
         """Remote IP address that created this Ctx"""
         return self._remote_ip
 
     @property
-    def remote_user(self):
+    def remote_user(self) -> str:
         """Remote user that created this Ctx"""
         return self._remote_user
 
-    def send_str(self, data):
+    def send_str(self, data: str) -> Coroutine[Any, Any, None]:
         """Send string to websocket"""
         return self._websocket.send_str(data)
 
-    def send_bytes(self, data):
+    def send_bytes(self, data: bytes) -> Coroutine[Any, Any, None]:
         """Send bytes to websocket"""
         return self._websocket.send_bytes(data)
 
-class PgWebsocket(object):
+
+class PgWebsocket:
     """An application to handle websocket to Postgresql proxying"""
 
-    _on_connect = lambda: False
-    _on_disconnect = lambda: False
-    _on_transaction = lambda: False
+    _on_connect: Callable[["Ctx"], Awaitable[Any]] = lambda: False  # type: ignore
+    _on_disconnect: Callable[["Ctx"], Awaitable[Any]] = lambda: False  # type: ignore
+    _on_transaction: Callable[["Ctx"], Awaitable[Any]] = lambda: False  # type: ignore
     _on_msg = {}
 
-    def __init__(self, dburl, bind='127.0.0.1', port=9000):
+    def __init__(self, dburl: str, bind: str = "127.0.0.1", port: int = 9000) -> None:
         """Create a websocket server to talk to db"""
         self._dburl = dburl
         self._bind = bind
         self._port = port
 
-    def on_connect(self, callback):
+    def on_connect(self, callback: Callable[["Ctx"], Awaitable[Any]]) -> None:
         """Register a callback after connection"""
-        self._on_connect = callback
+        self._on_connect = callback  # type: ignore
 
-    def on_disconnect(self, callback):
+    def on_disconnect(self, callback: Callable[["Ctx"], Awaitable[Any]]) -> None:
         """Register a callback before disconnection"""
-        self._on_disconnect = callback
+        self._on_disconnect = callback  # type: ignore
 
-    def on_transaction(self, callback):
+    def on_transaction(self, callback: Callable[["Ctx"], Awaitable[Any]]) -> None:
         """Register a callback after creating SQL transaction"""
-        self._on_transaction = callback
+        self._on_transaction = callback  # type: ignore
 
-    def on_msg(self, route):
+    def on_msg(
+        self, route: str
+    ) -> Callable[[Callable[["Ctx",], Awaitable[Any],]], None]:
         """Register a map of callbacks to handle diffrent messages. Callbacks can return True to stop processing this message."""
-        def wrap(callback):
+
+        def wrap(
+            callback: Callable[
+                [
+                    "Ctx",
+                ],
+                Awaitable[Any],
+            ]
+        ) -> None:
             """"""
             self._on_msg[route] = callback
+
         return wrap
 
-    async def _websocket_handler(self, request):
+    async def _websocket_handler(self, request: web.Request) -> web.WebSocketResponse:
         """Handle incoming websocket connections"""
 
-        LOGGER.info("Websocket connected: %s %s", request.raw_path, request.headers['X-FORWARDED-FOR'])
+        LOGGER.info(
+            "Websocket connected: %s %s",
+            request.raw_path,
+            request.headers["X-FORWARDED-FOR"],
+        )
 
         websocket = web.WebSocketResponse()
         ctx = Ctx(
             websocket,
             self._dburl,
-            request.headers['X-FORWARDED-FOR'],
-            int(request.headers["X-REMOTE-USER"]),
+            request.headers["X-FORWARDED-FOR"],
+            request.headers["X-REMOTE-USER"],
             self._on_connect,
-            self._on_disconnect
+            self._on_disconnect,
         )
 
         await websocket.prepare(request)
@@ -180,9 +218,7 @@ class PgWebsocket(object):
                 try:
                     await self._on_transaction(ctx)
 
-                    data = await ctx.callproc(
-                        *msg_ws
-                    )
+                    data = await ctx.callproc(*msg_ws)
                 except psycopg2.Error:
                     await ctx.execute("ROLLBACK;")
                     raise
@@ -190,17 +226,11 @@ class PgWebsocket(object):
                     await ctx.execute("COMMIT;")
 
                 if data is not None and data != "":
-                    websocket.send_str(
-                        data
-                    )
+                    websocket.send_str(data)
 
-            except Exception as err: #pylint: disable=broad-except; sort of the point
+            except Exception as err:  # pylint: disable=broad-except; sort of the point
                 LOGGER.error(traceback.format_exc())
-                websocket.send_str(
-                    json.dumps({
-                        "error": str(err)
-                    })
-                )
+                websocket.send_str(json.dumps({"error": str(err)}))
 
         ping.cancel()
 
@@ -208,24 +238,24 @@ class PgWebsocket(object):
 
         del ctx
 
-        LOGGER.info("Websocket disconnected: %s %s", request.raw_path, request.headers['X-FORWARDED-FOR'])
+        LOGGER.info(
+            "Websocket disconnected: %s %s",
+            request.raw_path,
+            request.headers["X-FORWARDED-FOR"],
+        )
 
         return websocket
 
-    def run(self, url=r'/'):
+    def run(self, url=r"/"):
         """Start listening for connections"""
         app = web.Application()
-        app.router.add_route('GET', url, self._websocket_handler)
+        app.router.add_route("GET", url, self._websocket_handler)
         loop = loop = asyncio.get_event_loop()
         handler = app.make_handler()
         srv = loop.run_until_complete(
-            loop.create_server(
-                handler,
-                self._bind,
-                self._port
-            )
+            loop.create_server(handler, self._bind, self._port)
         )
-        LOGGER.info('serving on %s', srv.sockets[0].getsockname())
+        LOGGER.info("serving on %s", srv.sockets[0].getsockname())
         try:
             loop.run_until_complete(srv.wait_closed())
         except KeyboardInterrupt:
