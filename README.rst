@@ -1,5 +1,23 @@
+===========
 pgwebsocket
 ===========
+.. image:: https://readthedocs.org/projects/pgwebsocket/badge/?version=latest
+    :target: https://pgwebsocket.readthedocs.io/en/latest/?badge=latest
+
+.. image:: https://badge.fury.io/py/pgwebsocket.svg
+    :target: https://badge.fury.io/py/pgwebsocket
+
+Async websocket to PostgreSQL proxy.
+
+Install
+-------
+
+::
+
+    pip install pgwebsocket
+
+Usage
+-----
 
 ::
 
@@ -22,4 +40,5 @@ pgwebsocket
     
     if __name__ == '__main__':
         app.run()
+
 
