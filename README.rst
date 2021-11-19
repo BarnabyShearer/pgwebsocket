@@ -14,7 +14,7 @@ Install
 
 ::
 
-    pip install pgwebsocket
+    python3 -m pip install pgwebsocket
 
 Usage
 -----
