@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 10s
+    environment:
+      POSTGRES_PASSWORD: secret
+  pgwebsocket:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+    - 9000:9000
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: secret
