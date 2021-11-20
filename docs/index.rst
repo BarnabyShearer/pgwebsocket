@@ -6,24 +6,19 @@ Async websocket to PostgreSQL proxy.
 Usage
 -----
 
-::
+.. code-block:: python
 
     from pgwebsocket import PgWebsocket
     
-    app = PgWebsocket(
-        "postgresql://"
-    )
+    app = PgWebsocket("")
     
     @app.on_connect
-    async def on_connect(ctx):
-        """"""
-        ctx.subscribed = []
-        await ctx.execute("LISTEN all;")
+    async def _on_connect(ctx):
+        await ctx.execute("LISTEN clients;")
     
     @app.on_disconnect
-    async def on_disconnect(ctx):
-        """"""
-        await ctx.execute("UNLISTEN all;")
+    async def _on_disconnect(ctx):
+        await ctx.execute("UNLISTEN clients;")
     
     if __name__ == '__main__':
         app.run()
