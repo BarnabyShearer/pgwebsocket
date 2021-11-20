@@ -19,7 +19,7 @@ Install
 Usage
 -----
 
-::
+.. code-block:: python
 
     from pgwebsocket import PgWebsocket
     
