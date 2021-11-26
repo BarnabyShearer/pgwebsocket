@@ -2,17 +2,16 @@
 pgwebsocket
 ===========
 .. image:: https://readthedocs.org/projects/pgwebsocket/badge/?version=latest
-    :target: https://pgwebsocket.readthedocs.io/en/latest/?badge=latest
-
-.. image:: https://badge.fury.io/py/pgwebsocket.svg
-    :target: https://badge.fury.io/py/pgwebsocket
+    :target: https://pgwebsocket.readthedocs.io/en/latest/
+.. image:: https://img.shields.io/pypi/v/pgwebsocket?color=success
+    :target: https://pypi.org/project/pgwebsocket
 
 Async websocket to PostgreSQL proxy.
 
 Install
 -------
 
-::
+.. code-block:: bash
 
     python3 -m pip install pgwebsocket
 
